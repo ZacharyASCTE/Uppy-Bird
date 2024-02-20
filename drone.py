@@ -42,7 +42,6 @@ class Drone:
         self.old_fps = 0
         self.recentlyDead = False
         self.frame_start = 0
-        self.time_limit = 8
         self.time_multiplier = 0
         
         self.distanceBot = 0
@@ -55,6 +54,7 @@ class Drone:
         self.y = 0
         self.xPosition = 0
         self.fitness = 50
+        self.jumps = 0
         self.alive = True
         self.frames = 0
 
@@ -68,7 +68,7 @@ class Drone:
             self.node_list = NodeListGenerator(*node_list_amount)
             self.breed(male, female)
 
-    def constants(self,radius,maze_line_width,space,spacing,loops,window_width,window_height,ai,time_multiplier):
+    def constants(self,radius,maze_line_width,space,spacing,loops,window_width,window_height,ai,time_multiplier,layer_time_limit):
         self.radius = radius
         self.maze_line_width = maze_line_width
         self.space = space
@@ -80,9 +80,9 @@ class Drone:
         self.window_height = window_height
         self.xPosition = window_width/2
         self.time_multiplier = time_multiplier
+        self.layer_time_limit = layer_time_limit
 
-    def variables(self, screen_height, fps, frames):
-        self.screen_height = screen_height
+    def variables(self, fps, frames):
         self.fps = fps
         self.frames = frames
 
@@ -93,22 +93,23 @@ class Drone:
                 pipeLowerY - The y coordinate of the lower pipe
                 pipeDistance - The x distance to the pipe pair
         OUTPUT: None"""
-        self.player_level = math.floor((self.y+self.screen_height)/self.spacing)
+        self.player_level = math.floor((self.y)/self.spacing)
 
         if (self.player_level>self.best_player_level):
             self.best_player_level = self.player_level
             self.frame_start = self.frames
 
-        self.distanceTop = self.spacing-(self.y+self.screen_height-self.radius)%self.spacing
-        self.distanceBot = self.spacing-(self.y+self.screen_height+2*self.radius)%self.spacing-self.maze_line_width+self.radius
-        print(self.screen_height)
-        if(self.y-self.window_height/2<self.radius-self.screen_height):
+        self.distanceTop = self.spacing-(self.y-self.radius)%self.spacing
+        self.distanceBot = self.spacing-(self.y+2*self.radius)%self.spacing-self.maze_line_width+self.radius
+
+        if(self.y<self.radius):
             self.fitness -= 1000
             self.alive = False
             self.recentlyDead = True
+
         else:
-            self.distanceLeft = self.xPosition-tracking_list[str(math.floor((self.y+(self.screen_height%self.spacing-self.radius))/self.spacing))]-self.radius
-            self.distanceRight = -(self.xPosition-tracking_list[str(math.floor((self.y+(self.screen_height%self.spacing-self.radius))/self.spacing))]-self.space)-self.radius
+            self.distanceLeft = self.xPosition-tracking_list[str(math.floor((self.y-self.radius)/self.spacing))]-self.radius
+            self.distanceRight = -(self.xPosition-tracking_list[str(math.floor((self.y-self.radius)/self.spacing))]-self.space)-self.radius
 
     def handleCollision(self):
         """Checks if the bird hits the upper bounds, lower bounds or a pipe
@@ -118,8 +119,9 @@ class Drone:
                 pipe - The pipe to handle the collision with
         OUTPUT: None"""
         #Check if player collided with upper or lower pipe
+
         if (self.ai):
-            if (self.frames>(self.time_limit*self.time_multiplier+self.frame_start)):
+            if (self.frames>(self.layer_time_limit*self.time_multiplier+self.frame_start)):
                 self.alive = False
                 self.recentlyDead = True
 

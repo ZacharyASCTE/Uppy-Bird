@@ -1,7 +1,6 @@
 import pygame
 import random
 import copy
-import math
 import time
 import drone
 
@@ -31,12 +30,13 @@ FAST_LEARN = 2
 learning_rate = REGULAR_LEARN
 
 jump_switch = False
-global_fitness_switch = False
 time_switch = False
 kill_all_switch = False
 fps_switch = False
 learn_switch = False
 restart_switch = False
+global_fitness_switch = False
+current_player_switch = False
 
 kill_all = False
 free_cam = 0
@@ -62,15 +62,19 @@ MAZE_LINE_WIDTH = 20
 PLAYER_TERMINAL_VELOCITY = -10
 RADIUS = 15
 JUMP_VELOCITY = 7
-LOOPS = math.floor(WINDOW_HEIGHT/SPACING)
+LOOPS = WINDOW_HEIGHT//SPACING
 
 globalFitness = -2000
 best_globalFitness = -2000
 best_player_level = 0
 best_generation = 0
 best_node_list = 0
+current_player_level = 0
+current_node_list = 0
 
 frames = 0
+minimum_player_level = -1
+layers_deleted = 0
 highest_player_height = 0
 highest_player_width = 0
 screen_height = WINDOW_HEIGHT/2
@@ -110,9 +114,6 @@ maze_level = 0
 
 tracking_list_current_number = 0
 tracking_list = {}
-for i in range(LOOPS+2):
-    tracking_list[str(i)] = random.randint(0,WINDOW_WIDTH-SPACE+1)
-    tracking_list_current_number += 1
 
 window = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT))
 window.fill((255,255,255))
@@ -128,12 +129,12 @@ def init():
     INPUT: None
     OUTPUT: None"""
 
-    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, highest_player_height, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level, highest_player_width
+    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted
 
     #Reset some global variables
     score = 0
-    highest_player_height = 0
-    highest_player_width = 0
+    minimum_player_level = -1
+    layers_deleted = 0
     kill_all = False
     globalFitness = -2000
     running = True
@@ -142,7 +143,7 @@ def init():
     tracking_list_current_number = 0
     tracking_list = {}
     for i in range(LOOPS+2):
-        tracking_list[str(i)] = random.randint(0,WINDOW_WIDTH-SPACE+1)
+        tracking_list[i] = random.randint(0,WINDOW_WIDTH-SPACE+1)
         tracking_list_current_number += 1
 
     if (not AI): #User plays: Initialize exactly one bird.
@@ -202,34 +203,33 @@ def generate_line(height,open_start,open_end,line_width,maze_width):
     pygame.draw.rect(window, (0,0,0), [maze_width,height,open_start,line_width])       #LR, UD, W, H
     pygame.draw.rect(window, (0,0,0), [open_end+maze_width,height,WINDOW_WIDTH-open_end,line_width])
 
-def generate_maze(maze_height, maze_width):
+def generate_maze(maze_height, maze_width, minimum_player_level):
     global maze_level
+    global layers_deleted
     global tracking_list_current_number
     global tracking_list
 
-    if (maze_height > SPACING*maze_level + WINDOW_HEIGHT/2):
-        maze_level+=1
-        tracking_list[str(tracking_list_current_number)] = random.randint(0,WINDOW_WIDTH-SPACE+1)
-        tracking_list_current_number += 1
-
     window.fill((255,255,255))
+
     for player in multiPlayer:
         if player.alive:
             pygame.draw.circle(window,(0,0,0),(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y),RADIUS)
+            
+    for x in range(minimum_player_level-2-layers_deleted):
+        del tracking_list[x+layers_deleted]
+    layers_deleted = max(minimum_player_level-2,0)
+    
     for x in range(len(tracking_list)):
-        top_of_rectangle = (len(tracking_list)-x-1)*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT
-        start = tracking_list[str(x)]
+        top_of_rectangle = (len(tracking_list)-1-x)*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT
+        start = tracking_list[x+layers_deleted]
         end = start + SPACE
         generate_line(top_of_rectangle,start,end,MAZE_LINE_WIDTH,maze_width)
+    
     pygame.draw.rect(window, (0,0,0), [maze_width-MAZE_LINE_WIDTH,0,MAZE_LINE_WIDTH,(len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT + MAZE_LINE_WIDTH])
     pygame.draw.rect(window, (0,0,0), [WINDOW_WIDTH+maze_width,0,MAZE_LINE_WIDTH,(len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT + MAZE_LINE_WIDTH])
     pygame.draw.rect(window, (0,0,0), [maze_width,((len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT),WINDOW_WIDTH,MAZE_LINE_WIDTH])
-    
-
-generate_maze(SPACING/2, 0)
 
 init()
-
 
 while True:
     currentfitness = 0.0
@@ -238,13 +238,14 @@ while True:
         if (event.type == 5) and (not running) and (not singlePlayer.alive):
             init()
 
-    # RENDER YOUR GAME HERE
-    
-    
-    #if pygame.key.get_pressed()[pygame.K_r]:
+    # if not pygame.key.get_pressed()[pygame.K_r] and not reset_switch:
+    #        reset_switch = True
+    # 
+    # if pygame.key.get_pressed()[pygame.K_r] and reset_switch:
+    #        reset_switch = False
     #        birdsToBreed = []
+    #        generation = 0
     #        init()
-    #        time.sleep(.02)
 
     if not pygame.key.get_pressed()[pygame.K_1] and not pygame.key.get_pressed()[pygame.K_2] and not pygame.key.get_pressed()[pygame.K_3] and not fps_switch:
             fps_switch = True
@@ -359,23 +360,34 @@ while True:
         if pygame.key.get_pressed()[pygame.K_z] and kill_all_switch:
             kill_all_switch = False
             kill_all = True
+
+        if not pygame.key.get_pressed()[pygame.K_q] and not current_player_switch:
+            current_player_switch = True
+
+        if pygame.key.get_pressed()[pygame.K_q] and current_player_switch:
+            current_player_switch = False
+            print("This generation is " + str(generation))
+            print("They have completed " + str(current_player_level) + " levels so far")
+            print("Their genes are " + str(current_node_list))
         
         if not pygame.key.get_pressed()[pygame.K_b] and not global_fitness_switch:
-                global_fitness_switch = True
+            global_fitness_switch = True
     
         if pygame.key.get_pressed()[pygame.K_b] and global_fitness_switch:
             global_fitness_switch = False
             print("Best global fitness is " + str(best_globalFitness))
             print("This was achieved on generation " + str(best_generation))
             print("They completed " + str(best_player_level) + " levels")
-            print("Their array is " + str(best_node_list))
-
+            print("Their genes are " + str(best_node_list))
 
         frames += 1
         highest_player_height = 0
+        minimum_player_level_temp = -1
         highest_player_width = 0
+        current_player_level = 0
+        current_node_list = 0
         for player in multiPlayer:
-            player.variables(fps, frames)
+            player.variables(fps, frames, layers_deleted)
 
             if kill_all:
                 player.alive = False
@@ -420,19 +432,24 @@ while True:
                             if (movement[2] > 0):
                                 player.xPosition += 5
                 
+                if (player.y//SPACING<minimum_player_level_temp or minimum_player_level_temp == -1):
+                    minimum_player_level_temp = int(player.y//SPACING)
+
                 if player.y > highest_player_height:
                     highest_player_height = player.y
                     highest_player_width = WINDOW_WIDTH/2 - player.xPosition
+                    current_node_list = player.node_list
+                    current_player_level = int(player.player_level)
 
             if(player.recentlyDead):
                 player.recentlyDead = False
                 player.fitness += player.y
-                total_floor_points = FLOOR_POINTS_MULTIPLIER*math.floor(player.y/SPACING)
+                total_floor_points = FLOOR_POINTS_MULTIPLIER*(player.y//SPACING)
                 player.fitness += total_floor_points
                 alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(800-abs(player.distanceLeft-player.distanceRight)/2)))
                 player.fitness += alignment_points
                 jump_points = player.jumps*JUMP_MULTIPLIER
-                player.fitness
+                player.fitness += jump_points
                 if time_limit_enabled:
                     player.fitness += TIME_POINTS*frames/MAX_FRAMES
                 if (player.fitness>best_globalFitness):
@@ -453,11 +470,18 @@ while True:
         elif free_cam == 1:
             screen_height = highest_player_height
             screen_width = highest_player_width
-        
-        generate_maze(screen_height,screen_width)
+
+        if (highest_player_height > SPACING*maze_level + WINDOW_HEIGHT/2):
+            maze_level+=1
+            tracking_list[tracking_list_current_number] = random.randint(0,WINDOW_WIDTH-SPACE+1)
+            tracking_list_current_number += 1
+
+        minimum_player_level = minimum_player_level_temp
 
         if (noAlive == 0):
             running = False
+        else:
+            generate_maze(screen_height,screen_width,minimum_player_level)
     else: #Player is dead (only seen, if user plays)
         if (not AI): #User played - highscore set?
             if (score > maxscore):

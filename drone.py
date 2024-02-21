@@ -57,6 +57,7 @@ class Drone:
         self.jumps = 0
         self.alive = True
         self.frames = 0
+        self.layers_deleted = 0
 
         if (male == None): #New Bird, no parents
             #easy network
@@ -82,9 +83,10 @@ class Drone:
         self.time_multiplier = time_multiplier
         self.layer_time_limit = layer_time_limit
 
-    def variables(self, fps, frames):
+    def variables(self, fps, frames, layers_deleted):
         self.fps = fps
         self.frames = frames
+        self.layers_deleted = layers_deleted
 
     def processBrain(self,tracking_list):
         """Updates what the bird sees.
@@ -93,7 +95,7 @@ class Drone:
                 pipeLowerY - The y coordinate of the lower pipe
                 pipeDistance - The x distance to the pipe pair
         OUTPUT: None"""
-        self.player_level = math.floor((self.y)/self.spacing)
+        self.player_level = self.y//self.spacing
 
         if (self.player_level>self.best_player_level):
             self.best_player_level = self.player_level
@@ -102,14 +104,14 @@ class Drone:
         self.distanceTop = self.spacing-(self.y-self.radius)%self.spacing
         self.distanceBot = self.spacing-(self.y+2*self.radius)%self.spacing-self.maze_line_width+self.radius
 
-        if(self.y<self.radius):
+        if(self.y<self.radius+self.layers_deleted*self.spacing):
             self.fitness -= 1000
             self.alive = False
             self.recentlyDead = True
 
         else:
-            self.distanceLeft = self.xPosition-tracking_list[str(math.floor((self.y-self.radius)/self.spacing))]-self.radius
-            self.distanceRight = -(self.xPosition-tracking_list[str(math.floor((self.y-self.radius)/self.spacing))]-self.space)-self.radius
+            self.distanceLeft = self.xPosition-tracking_list[(self.y-self.radius)//self.spacing]-self.radius
+            self.distanceRight = -(self.xPosition-tracking_list[(self.y-self.radius)//self.spacing]-self.space)-self.radius
 
     def handleCollision(self):
         """Checks if the bird hits the upper bounds, lower bounds or a pipe

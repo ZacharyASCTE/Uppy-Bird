@@ -217,6 +217,7 @@ def generate_maze(maze_height, maze_width, minimum_player_level):
             
     for x in range(minimum_player_level-2-layers_deleted):
         del tracking_list[x+layers_deleted]
+        print("Deleting Layer " + str(x+layers_deleted))
     layers_deleted = max(minimum_player_level-2,0)
     
     for x in range(len(tracking_list)):
@@ -448,8 +449,8 @@ while True:
                 player.fitness += total_floor_points
                 alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(800-abs(player.distanceLeft-player.distanceRight)/2)))
                 player.fitness += alignment_points
-                jump_points = player.jumps*JUMP_MULTIPLIER
-                player.fitness += jump_points
+                #jump_points = player.jumps*JUMP_MULTIPLIER
+                #player.fitness += jump_points
                 if time_limit_enabled:
                     player.fitness += TIME_POINTS*frames/MAX_FRAMES
                 if (player.fitness>best_globalFitness):
@@ -476,7 +477,7 @@ while True:
             tracking_list[tracking_list_current_number] = random.randint(0,WINDOW_WIDTH-SPACE+1)
             tracking_list_current_number += 1
 
-        minimum_player_level = minimum_player_level_temp
+        minimum_player_level = max(minimum_player_level,minimum_player_level_temp)
 
         if (noAlive == 0):
             running = False

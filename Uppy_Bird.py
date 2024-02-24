@@ -3,6 +3,7 @@ import random
 import copy
 import time
 import drone
+import numpy as np
 
 
 # pygame setup
@@ -23,6 +24,8 @@ FAST_FPS = 10
 
 fps = REGULAR_FPS
 
+FILE_NAME = "Best_Drone_Birds.txt"
+
 SLOW_LEARN = 1/2
 REGULAR_LEARN = 0.005
 FAST_LEARN = 2
@@ -37,8 +40,11 @@ learn_switch = False
 restart_switch = False
 global_fitness_switch = False
 current_player_switch = False
+best_save_switch = False
+current_save_switch = False
 
 kill_all = False
+load_bird = False
 free_cam = 0
 
 WINDOW_WIDTH = 800
@@ -71,6 +77,10 @@ best_generation = 0
 best_node_list = 0
 current_player_level = 0
 current_node_list = 0
+best_drones_file = 0
+list_of_best_drones = 0
+dictionary_of_best_drones = {}
+formatted_array = []
 
 frames = 0
 minimum_player_level = -1
@@ -129,7 +139,7 @@ def init():
     INPUT: None
     OUTPUT: None"""
 
-    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted
+    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted,load_bird
 
     #Reset some global variables
     score = 0
@@ -166,11 +176,16 @@ def init():
             #keep the best bird of generation without mutation
             _ = drone.Drone(learning_rate)
             _.setWeights(birdsToBreed[0].node_list)
+            if load_bird == True:
+                _.setWeights(formatted_array)
             multiPlayer.append(_)
 
             #also keep the best of all time alive without mutation
             _ = drone.Drone(learning_rate)
             _.setWeights(bestListofWeights)
+            if load_bird == True:
+                _.setWeights(formatted_array)
+                load_bird = False
             multiPlayer.append(_)
 
             for _ in range(int(DROCK/3)):
@@ -217,7 +232,6 @@ def generate_maze(maze_height, maze_width, minimum_player_level):
             
     for x in range(minimum_player_level-2-layers_deleted):
         del tracking_list[x+layers_deleted]
-        print("Deleting Layer " + str(x+layers_deleted))
     layers_deleted = max(minimum_player_level-2,0)
     
     for x in range(len(tracking_list)):
@@ -287,9 +301,8 @@ while True:
     if pygame.key.get_pressed()[pygame.K_f] and free_cam:
         free_cam = 0
     
-    if pygame.key.get_pressed()[pygame.K_g]:
+    if pygame.key.get_pressed()[pygame.K_g] and not free_cam == 1:
         free_cam = 1
-        time.sleep(.02)
     
     if pygame.key.get_pressed()[pygame.K_UP]:
         free_cam = 2
@@ -380,6 +393,48 @@ while True:
             print("This was achieved on generation " + str(best_generation))
             print("They completed " + str(best_player_level) + " levels")
             print("Their genes are " + str(best_node_list))
+
+        if not pygame.key.get_pressed()[pygame.K_j] and not current_save_switch:
+            current_save_switch = True
+
+        if pygame.key.get_pressed()[pygame.K_j] and current_save_switch:
+            current_save_switch = False
+            f = open(FILE_NAME, "a")
+            f.write("\n{};Current;{};".format(next_file_number,current_player_level) + str(current_node_list).replace("\n", "").replace(" ",""))
+            f.close()
+
+        if not pygame.key.get_pressed()[pygame.K_k] and not best_save_switch:
+            best_save_switch = True
+
+        if pygame.key.get_pressed()[pygame.K_k] and best_save_switch:
+            best_save_switch = False
+            next_file_number = 0
+            f = open(FILE_NAME, "a")
+            f.write("\n{};Best;{};".format(next_file_number,best_player_level) + str(best_node_list).replace("\n", "").replace(" ",""))
+            f.close()
+        
+        if pygame.key.get_pressed()[pygame.K_n]:
+            f = open(FILE_NAME, "r")
+            best_drones_file = f.read()
+            f.close()
+            list_of_best_drones = best_drones_file.split("\n")
+            for x in range(len(list_of_best_drones)):
+                list_of_best_drones[x] = list_of_best_drones[x].split(";")
+                dictionary_of_best_drones[list_of_best_drones[x].pop(0)] = list_of_best_drones[x]
+                pick_dictionary_key = True
+            while pick_dictionary_key:
+                dictionary_key = input(str(dictionary_of_best_drones).replace(" ","\n")+ '\n\nWhich drone do you want?\n')
+                if dictionary_key in dictionary_of_best_drones:
+                    if dictionary_of_best_drones[dictionary_key][0] == str(drone.node_list_amount).replace(" ",""):
+                        unformatted_drone_array = dictionary_of_best_drones[dictionary_key][3]
+                        pick_dictionary_key = False
+                    else:
+                        print("Array is of wrong size")
+                else:
+                    print("Key not in dictionary")
+            formatted_array = [np.array([[float(i) for i in j.replace("[","").replace("]","").split(",")] for j in k.split("],[")]) for k in unformatted_drone_array.replace("array(","").replace(")]","").replace("[[[","[[").split("),")]
+            load_bird = True
+            kill_all = True
 
         frames += 1
         highest_player_height = 0
@@ -520,7 +575,6 @@ while True:
                     #store the (two) best birds in the breeding list
                     birdsToBreed.append(copy.deepcopy(multiPlayer[bestBird]))
                     multiPlayer.pop(i)
-
                 #print("Best genes of this generation: {}\n{}"
                 #        .format(birdsToBreed[0].inputWeights,
                 #                birdsToBreed[0].hidden1Weights,

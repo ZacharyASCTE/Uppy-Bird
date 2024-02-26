@@ -35,6 +35,7 @@ learning_rate = REGULAR_LEARN
 jump_switch = False
 time_switch = False
 kill_all_switch = False
+graphics_switch = False
 fps_switch = False
 learn_switch = False
 restart_switch = False
@@ -44,6 +45,7 @@ best_save_switch = False
 current_save_switch = False
 
 kill_all = False
+graphics = True
 load_bird = False
 free_cam = 0
 
@@ -375,6 +377,13 @@ while True:
             kill_all_switch = False
             kill_all = True
 
+        if not pygame.key.get_pressed()[pygame.K_h] and not graphics_switch:
+            graphics_switch = True
+    
+        if pygame.key.get_pressed()[pygame.K_h] and graphics_switch:
+            graphics_switch = False
+            graphics = not graphics
+
         if not pygame.key.get_pressed()[pygame.K_q] and not current_player_switch:
             current_player_switch = True
 
@@ -537,7 +546,8 @@ while True:
         if (noAlive == 0):
             running = False
         else:
-            generate_maze(screen_height,screen_width,minimum_player_level)
+            if graphics:
+                generate_maze(screen_height,screen_width,minimum_player_level)
     else: #Player is dead (only seen, if user plays)
         if (not AI): #User played - highscore set?
             if (score > maxscore):

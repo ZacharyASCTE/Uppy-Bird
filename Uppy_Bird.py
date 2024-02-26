@@ -72,6 +72,9 @@ RADIUS = 15
 JUMP_VELOCITY = 7
 LOOPS = WINDOW_HEIGHT//SPACING
 
+#carl_image = pygame.image.load('Carl.png').convert_alpha()
+#carl_image = pygame.transform.scale(carl_image,(2*RADIUS,2*RADIUS))
+
 globalFitness = -2000
 best_globalFitness = -2000
 best_player_level = 0
@@ -141,7 +144,7 @@ def init():
     INPUT: None
     OUTPUT: None"""
 
-    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted,load_bird
+    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted,load_bird, generation
 
     #Reset some global variables
     score = 0
@@ -163,6 +166,8 @@ def init():
         singlePlayer = drone.Drone(learning_rate)
         multiPlayer.append(singlePlayer)
     else:
+        if load_bird:
+            generation = 1
         print("New Gen " + str(generation))
         singlePlayer = drone.Drone(learning_rate)
         if (len(birdsToBreed) == 0):
@@ -231,20 +236,26 @@ def generate_maze(maze_height, maze_width, minimum_player_level):
     for player in multiPlayer:
         if player.alive:
             pygame.draw.circle(window,(0,0,0),(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y),RADIUS)
+            #carl_rectangle = carl_image.get_rect(center=(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y))
+            #window.blit(carl_image,carl_rectangle)
             
     for x in range(minimum_player_level-2-layers_deleted):
         del tracking_list[x+layers_deleted]
     layers_deleted = max(minimum_player_level-2,0)
     
-    for x in range(len(tracking_list)):
-        top_of_rectangle = (len(tracking_list)-1-x)*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT
-        start = tracking_list[x+layers_deleted]
-        end = start + SPACE
-        generate_line(top_of_rectangle,start,end,MAZE_LINE_WIDTH,maze_width)
+    bottom_level = int((maze_height-WINDOW_HEIGHT/2)//SPACING-2)
+
+    for x in range(int(WINDOW_HEIGHT//SPACING+4)):
+        if (x+bottom_level) in tracking_list:
+            top_of_rectangle = (bottom_level+8-x-1)*SPACING + maze_height%SPACING - (maze_height//SPACING)*SPACING + WINDOW_HEIGHT/2
+            start = tracking_list[x+bottom_level]
+            end = start + SPACE
+            generate_line(top_of_rectangle,start,end,MAZE_LINE_WIDTH,maze_width)
+        elif (x+bottom_level+1) in tracking_list:
+            pygame.draw.rect(window, (0,0,0), [maze_width,((len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT),WINDOW_WIDTH,MAZE_LINE_WIDTH])
+    pygame.draw.rect(window, (0,0,0), [maze_width-MAZE_LINE_WIDTH,0,MAZE_LINE_WIDTH,(bottom_level+4-layers_deleted)*SPACING + maze_height%SPACING + WINDOW_HEIGHT/2 + MAZE_LINE_WIDTH])
+    pygame.draw.rect(window, (0,0,0), [WINDOW_WIDTH+maze_width,0,MAZE_LINE_WIDTH,(bottom_level+4-layers_deleted)*SPACING + maze_height%SPACING + WINDOW_HEIGHT/2 + MAZE_LINE_WIDTH])
     
-    pygame.draw.rect(window, (0,0,0), [maze_width-MAZE_LINE_WIDTH,0,MAZE_LINE_WIDTH,(len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT + MAZE_LINE_WIDTH])
-    pygame.draw.rect(window, (0,0,0), [WINDOW_WIDTH+maze_width,0,MAZE_LINE_WIDTH,(len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT + MAZE_LINE_WIDTH])
-    pygame.draw.rect(window, (0,0,0), [maze_width,((len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT),WINDOW_WIDTH,MAZE_LINE_WIDTH])
 
 init()
 
@@ -408,8 +419,16 @@ while True:
 
         if pygame.key.get_pressed()[pygame.K_j] and current_save_switch:
             current_save_switch = False
+            f = open(FILE_NAME, "r")
+            best_drones_file = f.read()
+            f.close()
+            list_of_best_drones = best_drones_file.split(";")
+            print(list_of_best_drones[-5])
+            list_of_best_drones[-5] = list_of_best_drones[-5].split("\n")
+            print(list_of_best_drones[-5])
+            next_file_number = int(list_of_best_drones[-5][1]) + 1
             f = open(FILE_NAME, "a")
-            f.write("\n{};Current;{};".format(next_file_number,current_player_level) + str(current_node_list).replace("\n", "").replace(" ",""))
+            f.write("\n{};{};Current;{};{}".format(next_file_number,str(drone.node_list_amount).replace("\n", "").replace(" ",""),current_player_level,str(current_node_list).replace("\n", "").replace(" ","")))
             f.close()
 
         if not pygame.key.get_pressed()[pygame.K_k] and not best_save_switch:
@@ -417,9 +436,14 @@ while True:
 
         if pygame.key.get_pressed()[pygame.K_k] and best_save_switch:
             best_save_switch = False
-            next_file_number = 0
+            f = open(FILE_NAME, "r")
+            best_drones_file = f.read()
+            f.close()
+            list_of_best_drones = best_drones_file.split(";")
+            list_of_best_drones[-5] = list_of_best_drones[-5].split("\n")
+            next_file_number = int(list_of_best_drones[-5][1]) + 1
             f = open(FILE_NAME, "a")
-            f.write("\n{};Best;{};".format(next_file_number,best_player_level) + str(best_node_list).replace("\n", "").replace(" ",""))
+            f.write("\n{};{};Best;{};{}".format(next_file_number,str(drone.node_list_amount).replace("\n", "").replace(" ",""),best_player_level,str(best_node_list).replace("\n", "").replace(" ","")))
             f.close()
         
         if pygame.key.get_pressed()[pygame.K_n]:

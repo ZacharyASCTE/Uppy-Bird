@@ -144,7 +144,7 @@ def init():
     INPUT: None
     OUTPUT: None"""
 
-    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted,load_bird, generation
+    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list, tracking_list_current_number, maze_level, minimum_player_level, layers_deleted, load_bird, generation
 
     #Reset some global variables
     score = 0

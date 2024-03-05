@@ -118,11 +118,11 @@ highgen = 0
 running = True
 generation = 1
 birdsToBreed = []
-number_of_birds_to_keep = 2
+number_of_birds_to_keep = 5
 singlePlayer = None
 respawn = False
 highscore = 0
-weight = 1.0000001                           
+weight = 1.2                      
 magic_breeding_numbers = [(10**(math.log10(weight)*(2+_)))-(10**((_+1)*math.log10(weight)))-weight+1 for _ in range(number_of_birds_to_keep)]
 magic_number = magic_breeding_numbers[-1]
 
@@ -199,7 +199,7 @@ def init():
                 multiPlayer.append(drone.Drone(learning_rate,*magic_breeding_function()))
             for _ in range(int(DROCK/3)):
                 #Breed and mutate the generations best bird a couple of times
-                multiPlayer.append(drone.Drone(learning_rate,magic_breeding_function(True)))
+                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,1)]))
 
             for _ in range(int(DROCK/3)-2):
                 if (respawn): #Bad genes - replace some.

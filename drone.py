@@ -2,7 +2,8 @@ import numpy as np
 import math
 import random
 
-node_list_amount = [4,4,3]
+active_inputs=["distanceLeftWall","velocity","distanceTop","distHole", "distanceRightWall"]
+node_list_amount = [len(active_inputs),4,3]
 
 class Drone:
     """The Bird class. Contains information about the bird and also it's brain,
@@ -43,6 +44,8 @@ class Drone:
         self.recentlyDead = False
         self.frame_start = 0
         self.time_multiplier = 0
+        self.vision = 10000
+        self.hole_vision_multi = 0.03 # Multiplier for vision of hole
         
         self.distanceBot = 0
         self.distanceTop = 0
@@ -58,6 +61,30 @@ class Drone:
         self.alive = True
         self.frames = 0
         self.layers_deleted = 0
+        self.old_level = 0
+        self.velocity_max_up = 0
+        self.velocity_max_down = 0
+        self.distanceRightWall = float('inf')
+        self.distanceLeftWall = float('inf')
+        self.distHole = float('inf')
+
+        self.radius = 0
+        self.maze_line_width = 0
+        self.space = 0
+        self.spacing = 0
+        self.loops = 0
+        self.ai = 0
+        self.y = 0
+        self.window_width = 0
+        self.window_height = 0
+        self.xPosition = 0 # - Left + Right
+        self.time_multiplier = 0
+        self.layer_time_limit = 0
+        self.velocity_max_up = 0
+        self.velocity_max_down = 0
+        self.deathModifier = 0
+        self.discoveryBonus =500
+        self.bonusAchieved = False
 
         if (male == None): #New Bird, no parents
             #easy network
@@ -68,8 +95,11 @@ class Drone:
         else: # Two parents - Breed.
             self.node_list = NodeListGenerator(*node_list_amount)
             self.breed(male, female)
+    def refreshDict(self):
+        self.possible_inputs = {"distanceRightWall": [self.distanceRightWall,self.window_width,0,],"distanceLeftWall": [self.distanceLeftWall,self.window_width,0,],"velocity": [self.velocity,self.velocity_max_up,self.velocity_max_down,],"distanceBot": [self.distanceBot,self.spacing,0,],"distHole": [self.distHole,self.window_width,-self.window_width,],"distanceTop": [self.distanceBot,self.spacing,0,]}
 
-    def constants(self,radius,maze_line_width,space,spacing,loops,window_width,window_height,ai,time_multiplier,layer_time_limit):
+
+    def constants(self,radius,maze_line_width,space,spacing,loops,window_width,window_height,ai,time_multiplier,layer_time_limit,velocity_max_up,velocity_max_down):
         self.radius = radius
         self.maze_line_width = maze_line_width
         self.space = space
@@ -79,9 +109,11 @@ class Drone:
         self.y = spacing/4
         self.window_width = window_width
         self.window_height = window_height
-        self.xPosition = window_width/2
+        self.xPosition = window_width/2 # - Left + Right
         self.time_multiplier = time_multiplier
         self.layer_time_limit = layer_time_limit
+        self.velocity_max_up = velocity_max_up
+        self.velocity_max_down = velocity_max_down
 
     def variables(self, fps, frames, layers_deleted):
         self.fps = fps
@@ -112,6 +144,17 @@ class Drone:
         else:
             self.distanceLeft = self.xPosition-tracking_list[(self.y-self.radius)//self.spacing]-self.radius
             self.distanceRight = -(self.xPosition-tracking_list[(self.y-self.radius)//self.spacing]-self.space)-self.radius
+            self.distHole = abs(self.distanceLeft-self.distanceRight)/2 if abs(self.distanceLeft+self.space) <= self.vision * self.hole_vision_multi or (self.distHole != float('inf') and self.player_level == self.old_level) else float('inf') 
+            #self.distanceLeftWall = self.xPosition if self.xPosition <= 50 or (self.distanceLeft != float('inf') and self.player_level == self.old_level) else float('inf')
+            self.distanceLeftWall = self.xPosition if self.xPosition <= self.vision or (self.distanceLeftWall != float('inf') and self.player_level == self.old_level) else float('inf')
+            self.distanceRightWall = self.window_width-self.xPosition if self.window_width-self.xPosition <= 50 or (self.distanceRightWall != float('inf') and self.player_level == self.old_level) else float('inf')
+            self.distanceMasterWall = self.xPosition if self.xPosition <= self.vision or self.xPosition >= self.window_width-self.vision or (self.distanceLeftWall != float('inf') and self.player_level == self.old_level) else float('inf')
+            if self.old_level == self.player_level and self.distHole!=float('inf') and not(self.bonusAchieved):
+                self.bonusAchieved = True
+                self.fitness += self.discoveryBonus * (sum([_!=float('inf') for _ in [self.distanceRightWall,self.distanceLeftWall,self.distHole]]))
+            elif self.old_level != self.player_level: self.bonusAchieved = False
+
+        self.old_level = self.player_level
 
     def handleCollision(self):
         """Checks if the bird hits the upper bounds, lower bounds or a pipe
@@ -126,14 +169,17 @@ class Drone:
             if (self.frames>(self.layer_time_limit*self.time_multiplier+self.frame_start)):
                 self.alive = False
                 self.recentlyDead = True
+                self.deathModifier = 200
 
         if (self.radius > self.xPosition) or self.radius>(self.window_width-self.xPosition):
             self.alive = False
             self.recentlyDead = True
+            self.deathModifier = 600
 
         if ((self.distanceTop<(self.maze_line_width+2*self.radius)) and (self.distanceLeft<-self.radius or self.distanceRight<-self.radius) or ((self.radius>math.sqrt((self.distanceLeft+self.radius)**2+(self.distanceTop-self.maze_line_width-self.radius)**2) or self.radius>math.sqrt((self.distanceLeft+self.radius)**2+(self.distanceTop-self.radius)**2)) or (self.distanceTop<(self.maze_line_width+self.radius) and self.distanceTop>=self.radius and self.distanceLeft<0)) or ((self.radius>math.sqrt((self.distanceRight+self.radius)**2+(self.distanceTop-self.maze_line_width-self.radius)**2) or self.radius>math.sqrt((self.distanceRight+self.radius)**2+(self.distanceTop-self.radius)**2)) or (self.distanceTop<(self.maze_line_width+self.radius) and self.distanceTop>=self.radius and self.distanceRight<0))):
             self.alive = False
             self.recentlyDead = True
+            self.deathModifier = 500
             
 
     def thinkIfMove(self):
@@ -147,9 +193,11 @@ class Drone:
         OUTPUT: boolean, which determines,
                     if the bird should jump (True) or not (False)"""
         BIAS = -0.5
-        X = [self.distanceTop, self.distanceLeft, self.velocity, self.distanceBot]
+        self.refreshDict()
+        _ = list(map(self.normalization, [self.possible_inputs[_] for _ in active_inputs]))
+
         
-        hidden_layer_in = np.dot(X,self.node_list[0])
+        hidden_layer_in = np.dot(_,self.node_list[0])
         hidden_layer_out = self.sigmoid(hidden_layer_in)
         for _ in range(len(node_list_amount[1:-2])):
             hidden_layer_in = np.dot(hidden_layer_out,self.node_list[_+1])
@@ -164,6 +212,12 @@ class Drone:
         c = prediction3+BIAS
 
         return a,b,c
+    
+    def debugLists(*args):
+        for i in range(len(args)): print(str(i) + ": " + str(args[i]))
+    
+    def normalization(self, args):    #args = inputvalue,maximum,minimum
+        return -1.0 if args[0] == float('inf') else (args[0]-args[1])/(args[1]-args[2])
         
     def sigmoid(self, x):
         """The sigmoid activation function for the neural net

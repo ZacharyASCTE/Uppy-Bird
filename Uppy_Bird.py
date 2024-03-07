@@ -12,7 +12,7 @@ screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 running = True
 
-DROCK = 200 #No of DROCKs to spawn
+DROCK = 90 #No of DROCKs to spawn
 
 AI = True # Set to false, if you want to play yourself
 GRAVITY_TOGGLE = True
@@ -49,19 +49,19 @@ graphics = True
 load_bird = False
 free_cam = 0
 
-WINDOW_WIDTH = 800
+WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
 
-time_limit_enabled = True
+time_limit_enabled = False
 TIME_POINTS = 200
 TIME_LIMIT = 10
 TIME_MULTIPLIER = 35 #DO NOT CHANGE
-LAYER_TIME_LIMIT = 7
+LAYER_TIME_LIMIT = 25
 MAX_FRAMES = TIME_MULTIPLIER*TIME_LIMIT
 
 JUMP_MULTIPLIER = -20
 ALIGNMENT_MULTIPLIER = 1
-FLOOR_POINTS_MULTIPLIER = 800
+FLOOR_POINTS_MULTIPLIER = 1000
 
 GRAVITY = .375
 SPACING = 200
@@ -71,6 +71,7 @@ PLAYER_TERMINAL_VELOCITY = -10
 RADIUS = 15
 JUMP_VELOCITY = 7
 LOOPS = WINDOW_HEIGHT//SPACING
+PLAYER_HORIZONTAL_SPEED = 5
 
 globalFitness = -2000
 best_globalFitness = -2000
@@ -94,6 +95,7 @@ screen_height = WINDOW_HEIGHT/2
 screen_width = 0
 player_position = WINDOW_WIDTH/2
 player_velocity = 0
+max_horizontal = int(3/4*SPACING/JUMP_VELOCITY*PLAYER_HORIZONTAL_SPEED*1.05) # Maximum distance a bird can travel horizontally while holding spacebar 
 
 player_upper_pole_height_difference = 0
 player_lower_pole_height_difference = 0
@@ -118,11 +120,11 @@ highgen = 0
 running = True
 generation = 1
 birdsToBreed = []
-number_of_birds_to_keep = 5
+number_of_birds_to_keep = 4
 singlePlayer = None
 respawn = False
 highscore = 0
-weight = 1.2                      
+weight = 1.3
 magic_breeding_numbers = [(10**(math.log10(weight)*(2+_)))-(10**((_+1)*math.log10(weight)))-weight+1 for _ in range(number_of_birds_to_keep)]
 magic_number = magic_breeding_numbers[-1]
 
@@ -156,10 +158,11 @@ def init():
     running = True
     frames = 0
     maze_level = 0
-    tracking_list_current_number = 0
-    tracking_list = {}
-    for i in range(LOOPS+2):
-        tracking_list[i] = random.randint(0,WINDOW_WIDTH-SPACE+1)
+    tracking_list = {0: (random.randint(0,WINDOW_WIDTH/2-SPACE-max_horizontal) if random.randint(0,1) else random.randint(WINDOW_WIDTH/2+max_horizontal,WINDOW_WIDTH-SPACE))}
+    init_list = int(bool(tracking_list))
+    tracking_list_current_number = init_list
+    for i in range(LOOPS+2-init_list):
+        tracking_list[i+init_list] = random.randint(0,WINDOW_WIDTH-SPACE+1)
         tracking_list_current_number += 1
 
     if (not AI): #User plays: Initialize exactly one bird.
@@ -199,7 +202,7 @@ def init():
                 multiPlayer.append(drone.Drone(learning_rate,*magic_breeding_function()))
             for _ in range(int(DROCK/3)):
                 #Breed and mutate the generations best bird a couple of times
-                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,1)]))
+                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,math.ceil(number_of_birds_to_keep/5))]))
 
             for _ in range(int(DROCK/3)-2):
                 if (respawn): #Bad genes - replace some.
@@ -211,7 +214,7 @@ def init():
             if (respawn):
                 respawn = False
     for player in multiPlayer:
-        player.constants(RADIUS,MAZE_LINE_WIDTH,SPACE,SPACING,LOOPS,WINDOW_WIDTH,WINDOW_HEIGHT,AI,TIME_MULTIPLIER, LAYER_TIME_LIMIT)
+        player.constants(RADIUS,MAZE_LINE_WIDTH,SPACE,SPACING,LOOPS,WINDOW_WIDTH,WINDOW_HEIGHT,AI,TIME_MULTIPLIER,LAYER_TIME_LIMIT,JUMP_VELOCITY,PLAYER_TERMINAL_VELOCITY)
 
 def magic_breeding_function(one=None):
     index_a = None
@@ -514,10 +517,10 @@ while True:
                             player.velocity = JUMP_VELOCITY
                         if (movement[1] > movement[2]):
                             if (movement[1] > 0):
-                                player.xPosition -= 5
+                                player.xPosition -= PLAYER_HORIZONTAL_SPEED
                         else:
                             if (movement[2] > 0):
-                                player.xPosition += 5
+                                player.xPosition += PLAYER_HORIZONTAL_SPEED
                 
                 if (player.y//SPACING<minimum_player_level_temp or minimum_player_level_temp == -1):
                     minimum_player_level_temp = int(player.y//SPACING)
@@ -530,11 +533,14 @@ while True:
 
             if(player.recentlyDead):
                 player.recentlyDead = False
-                player.fitness += player.y
+                #player.fitness += player.y
                 total_floor_points = FLOOR_POINTS_MULTIPLIER*(player.y//SPACING)
                 player.fitness += total_floor_points
-                alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(800-abs(player.distanceLeft-player.distanceRight)/2)))
-                player.fitness += alignment_points
+                #Alignment Points- Max raw 800. Min raw 0. Starts to increase when player is within half of window_width of hole.
+                alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(WINDOW_WIDTH-abs(player.distanceLeft-player.distanceRight)/2)))
+                hole_found = 300 if player.distHole != float('inf') else 0
+                if hole_found: player.fitness += alignment_points
+                player.fitness -= player.deathModifier 
                 #jump_points = player.jumps*JUMP_MULTIPLIER
                 #player.fitness += jump_points
                 if time_limit_enabled:
@@ -552,7 +558,7 @@ while True:
                     globalFitness = player.fitness
         
         if free_cam == 0:
-            screen_height = max(highest_player_height, WINDOW_HEIGHT/2)
+            screen_height = max(highest_player_height, WINDOW_HEIGHT/2,(highest_player_height+screen_height)/2)
             screen_width = 0
         elif free_cam == 1:
             screen_height = highest_player_height

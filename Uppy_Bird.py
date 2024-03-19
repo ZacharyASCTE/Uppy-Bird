@@ -635,9 +635,3 @@ while True:
 pygame.quit()
 
 
-
-
-# Height centered on player
-# Gain points when you go up
-# Lose points for time
-# Player controls maze

@@ -4,7 +4,7 @@ import copy
 import time
 import drone
 import numpy as np
-
+import math
 
 # pygame setup
 pygame.init()
@@ -88,6 +88,7 @@ dictionary_of_best_drones = {}
 visual_dictionary_of_best_drones = {}
 formatted_array = []
 
+
 frames = 0
 minimum_player_level = -1
 layers_deleted = 0
@@ -128,10 +129,13 @@ highgen = 0
 running = True
 generation = 1
 birdsToBreed = []
-number_of_birds_to_keep = 2
+number_of_birds_to_keep = 5
 singlePlayer = None
 respawn = False
 highscore = 0
+weight = 1.2                      
+magic_breeding_numbers = [(10**(math.log10(weight)*(2+_)))-(10**((_+1)*math.log10(weight)))-weight+1 for _ in range(number_of_birds_to_keep)]
+magic_number = magic_breeding_numbers[-1]
 
 maze_level = 0
 
@@ -205,22 +209,40 @@ def init():
 
             for _ in range(int(DROCK/3)):
                 #Breed and mutate the two generations best birds sometimes
-                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[0],birdsToBreed[1]))
+                multiPlayer.append(drone.Drone(learning_rate,*magic_breeding_function()))
             for _ in range(int(DROCK/3)):
                 #Breed and mutate the generations best bird a couple of times
-                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[0]))
+                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,1)]))
 
             for _ in range(int(DROCK/3)-2):
                 if (respawn): #Bad genes - replace some.
                     multiPlayer.append(drone.Drone(learning_rate))
                 else:
                     #Breed and mutate the generations second best bird asometimes
-                    multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[1]))
+                    multiPlayer.append(drone.Drone(learning_rate,magic_breeding_function(True)))
 
             if (respawn):
                 respawn = False
     for player in multiPlayer:
         player.constants(RADIUS,MAZE_LINE_WIDTH,SPACE,SPACING,LOOPS,WINDOW_WIDTH,WINDOW_HEIGHT,AI,TIME_MULTIPLIER, LAYER_TIME_LIMIT)
+
+def magic_breeding_function(one=None):
+    index_a = None
+    index_b = None
+    random_number = random.uniform(0,magic_number)
+    for i in range(len(magic_breeding_numbers)): # best = -1 second best = -2...
+        if random_number <= magic_breeding_numbers[i]:
+            index_a = i
+            break
+    if one:
+        return birdsToBreed[-(index_a+1)]
+    while not(index_b!=None and index_a!=index_b):
+        random_number = random.uniform(0,magic_number)
+        for i in range(len(magic_breeding_numbers)): # best = -1 second best = -2...
+            if random_number <= magic_breeding_numbers[i]:
+                index_b = i
+                break
+    return birdsToBreed[-(index_a+1)], birdsToBreed[-(index_b+1)]
 
 def reset_game():
     tracking = {}

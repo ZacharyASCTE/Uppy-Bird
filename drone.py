@@ -44,8 +44,8 @@ class Drone:
         self.recentlyDead = False
         self.frame_start = 0
         self.time_multiplier = 0
-        self.vision = 10000
-        self.hole_vision_multi = 0.03 # Multiplier for vision of hole
+        self.vision = 150
+        self.hole_vision_multi = 0.5 # Multiplier for vision of hole
         
         self.distanceBot = 0
         self.distanceTop = 0

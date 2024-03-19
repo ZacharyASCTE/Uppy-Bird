@@ -85,6 +85,7 @@ current_node_list = 0
 best_drones_file = 0
 list_of_best_drones = 0
 dictionary_of_best_drones = {}
+visual_dictionary_of_best_drones = {}
 formatted_array = []
 
 frames = 0
@@ -103,6 +104,13 @@ player_left_pole_distance_difference = 0
 player_right_pole_distance_difference = 0
 
 #GlobalVariable Setup
+
+def superReplace(s,r,w=[],d=None): # string, replace, with, default
+  if d or d == False or d=="":
+    w = [w[_] if len(w)-1>=_ else str(d) for _ in range(len(r))]
+  for _ in range(len(r)):
+    s = s.replace(str(r[_]),str(w[_]))
+  return s
 
 def ListShapeGenerator(*args):
             _ = []
@@ -428,7 +436,7 @@ while True:
             print(list_of_best_drones[-5])
             next_file_number = int(list_of_best_drones[-5][1]) + 1
             f = open(FILE_NAME, "a")
-            f.write("\n{};{};Current;{};{}".format(next_file_number,str(drone.node_list_amount).replace("\n", "").replace(" ",""),current_player_level,str(current_node_list).replace("\n", "").replace(" ","")))
+            f.write("\n{};{};Current;{};{}".format(next_file_number,superReplace(str(drone.node_list_amount),["\n"," "],d=""),int(current_player_level),superReplace(str(current_node_list),["\n"," "],d="")))
             f.close()
 
         if not pygame.key.get_pressed()[pygame.K_k] and not best_save_switch:
@@ -443,7 +451,7 @@ while True:
             list_of_best_drones[-5] = list_of_best_drones[-5].split("\n")
             next_file_number = int(list_of_best_drones[-5][1]) + 1
             f = open(FILE_NAME, "a")
-            f.write("\n{};{};Best;{};{}".format(next_file_number,str(drone.node_list_amount).replace("\n", "").replace(" ",""),best_player_level,str(best_node_list).replace("\n", "").replace(" ","")))
+            f.write("\n{};{};Best;{};{}".format(next_file_number,superReplace(str(drone.node_list_amount),["\n"," "],d=""),int(best_player_level),superReplace(str(best_node_list),["\n"," "],d="")))
             f.close()
         
         if pygame.key.get_pressed()[pygame.K_n]:
@@ -454,9 +462,12 @@ while True:
             for x in range(len(list_of_best_drones)):
                 list_of_best_drones[x] = list_of_best_drones[x].split(";")
                 dictionary_of_best_drones[list_of_best_drones[x].pop(0)] = list_of_best_drones[x]
+                visual_dictionary_of_best_drones[x] = [["Neural net size is {}","Their {} levels completed is"," {} levels","Their genes are {}"][_].format(dictionary_of_best_drones[str(x+1)][_]) for _ in range(len(dictionary_of_best_drones[str(x+1)]))]
+                visual_dictionary_of_best_drones[x][1] = visual_dictionary_of_best_drones[x][1]+ visual_dictionary_of_best_drones[x].pop(2)
+                print(type(visual_dictionary_of_best_drones))
                 pick_dictionary_key = True
             while pick_dictionary_key:
-                dictionary_key = input(str(dictionary_of_best_drones).replace(" ","\n")+ '\n\nWhich drone do you want?\n')
+                dictionary_key = input(superReplace(str(visual_dictionary_of_best_drones),["', '","{","['","']",", ","}"],["\n","","","\n","\n",""])+ '\n\nWhich drone do you want?\n')
                 if dictionary_key in dictionary_of_best_drones:
                     if dictionary_of_best_drones[dictionary_key][0] == str(drone.node_list_amount).replace(" ",""):
                         unformatted_drone_array = dictionary_of_best_drones[dictionary_key][3]
@@ -465,7 +476,7 @@ while True:
                         print("Array is of wrong size")
                 else:
                     print("Key not in dictionary")
-            formatted_array = [np.array([[float(i) for i in j.replace("[","").replace("]","").split(",")] for j in k.split("],[")]) for k in unformatted_drone_array.replace("array(","").replace(")]","").replace("[[[","[[").split("),")]
+            formatted_array = [np.array([[float(i) for i in superReplace(j,["[","]"],d="").split(",")] for j in k.split("],[")]) for k in superReplace(unformatted_drone_array,["array(",")]","[[["],["","","[["]).split("),")]
             load_bird = True
             kill_all = True
 

@@ -89,12 +89,7 @@ class Drone:
         self.layers_deleted = layers_deleted
 
     def processBrain(self,tracking_list):
-        """Updates what the bird sees.
-
-        INPUT:  pipeUpperY - The y coordinate of the upper pipe
-                pipeLowerY - The y coordinate of the lower pipe
-                pipeDistance - The x distance to the pipe pair
-        OUTPUT: None"""
+        # Updates what the bird sees
         self.player_level = self.y//self.spacing
 
         if (self.player_level>self.best_player_level):
@@ -114,14 +109,7 @@ class Drone:
             self.distanceRight = -(self.xPosition-tracking_list[(self.y-self.radius)//self.spacing]-self.space)-self.radius
 
     def handleCollision(self):
-        """Checks if the bird hits the upper bounds, lower bounds or a pipe
-
-        INPUT:  HEIGHT - The global height of the screen
-                BLOCKSIZE - The global bird size
-                pipe - The pipe to handle the collision with
-        OUTPUT: None"""
-        #Check if player collided with upper or lower pipe
-
+        #Check if player collided with any obstacle
         if (self.ai):
             if (self.frames>(self.layer_time_limit*self.time_multiplier+self.frame_start)):
                 self.alive = False
@@ -137,15 +125,7 @@ class Drone:
             
 
     def thinkIfMove(self):
-        """Forward pass through neural network,
-            giving the decision if the bird should jump.
-        The neural network consists out of the y position of the bird,
-            y distance to the bottom pipe, the y distance to the top pipe,
-            the x distance to the pipe pair and the own velocity.
-
-        INPUT:  None
-        OUTPUT: boolean, which determines,
-                    if the bird should jump (True) or not (False)"""
+        # Deciding whether or not the bird should move
         BIAS = -0.5
         X = [self.distanceTop, self.distanceLeft, self.velocity, self.distanceBot]
         

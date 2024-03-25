@@ -2,7 +2,7 @@ import numpy as np
 import math
 import random
 
-active_inputs=["distanceLeftWall","velocity","distanceTop","distHole", "distanceRightWall","horizontal_velocity"]
+active_inputs=["leftWall","rightWall","velocity","distanceTop","distHole","horizontal_velocity"]
 node_list_amount = [len(active_inputs),4,3]
 
 class Drone:
@@ -98,7 +98,7 @@ class Drone:
             self.node_list = NodeListGenerator(*node_list_amount)
             self.breed(male, female)
     def refreshDict(self):
-        self.possible_inputs = {"distanceRightWall": [self.distanceRightWall,self.window_width,0,],"distanceLeftWall": [self.distanceLeftWall,self.window_width,0,],"velocity": [self.velocity,self.velocity_max_up,self.velocity_max_down,],"distanceBot": [self.distanceBot,self.spacing,0,],"distHole": [self.distHole,self.window_width,-self.window_width,],"distanceTop": [self.distanceBot,self.spacing,0,],"horizontal_velocity": [self.horizontal_velocity,self.max_horizontal_velocity,-self.max_horizontal_velocity]}
+        self.possible_inputs = {"leftWall": [self.leftWall,1,0,], "rightWall": [self.rightWall,1,0,],"distanceRightWall": [self.distanceRightWall,self.window_width,0,],"distanceLeftWall": [self.distanceLeftWall,self.window_width,0,],"velocity": [self.velocity,self.velocity_max_up,self.velocity_max_down,],"distanceBot": [self.distanceBot,self.spacing,0,],"distHole": [self.distHole,self.window_width,-self.window_width,],"distanceTop": [self.distanceBot,self.spacing,0,],"horizontal_velocity": [self.horizontal_velocity,self.max_horizontal_velocity,-self.max_horizontal_velocity]}
 
 
     def constants(self,radius,maze_line_width,space,spacing,loops,window_width,window_height,ai,time_multiplier,layer_time_limit,velocity_max_up,velocity_max_down,max_horizontal_velocity):
@@ -152,6 +152,8 @@ class Drone:
             self.distanceLeftWall = self.xPosition if self.xPosition <= self.vision or (self.distanceLeftWall != float('inf') and self.player_level == self.old_level) else float('inf')
             self.distanceRightWall = self.window_width-self.xPosition if self.window_width-self.xPosition <= 50 or (self.distanceRightWall != float('inf') and self.player_level == self.old_level) else float('inf')
             self.distanceMasterWall = self.xPosition if self.xPosition <= self.vision or self.xPosition >= self.window_width-self.vision or (self.distanceLeftWall != float('inf') and self.player_level == self.old_level) else float('inf')
+            self.leftWall = int(self.xPosition <= self.vision or (self.distanceLeftWall != 1 and self.player_level == self.old_level))
+            self.rightWall = int(self.window_width-self.xPosition <= 50 or (self.distanceRightWall != 1 and self.player_level == self.old_level))
             if self.old_level == self.player_level and self.distHole!=float('inf') and not(self.bonusAchieved):
                 self.bonusAchieved = True
                 self.fitness += self.discoveryBonus * (sum([_!=float('inf') for _ in [self.distanceRightWall,self.distanceLeftWall,self.distHole]]))

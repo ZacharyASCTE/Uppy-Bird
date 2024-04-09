@@ -12,10 +12,10 @@ screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 running = True
 
-DROCK = 200 #No of DROCKs to spawn
+DROCK = 90 #No of DROCKs to spawn
 
-AI = True # Set to false, if you want to play yourself
-GRAVITY_TOGGLE = True
+AI = False # Set to false, if you want to play yourself
+GRAVITY_TOGGLE = False
 birdView = True # Set to false, if you don't want to see what the birds see
 
 SLOW_FPS = 1/10
@@ -48,20 +48,22 @@ kill_all = False
 graphics = True
 load_bird = False
 free_cam = 0
+DEBUG = 0
 
-WINDOW_WIDTH = 800
+WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
 
-time_limit_enabled = True
+time_limit_enabled = False
 TIME_POINTS = 200
-TIME_LIMIT = 10
+TIME_LIMIT = 300
 TIME_MULTIPLIER = 35 #DO NOT CHANGE
-LAYER_TIME_LIMIT = 7
+LAYER_TIME_LIMIT = 30 #25
 MAX_FRAMES = TIME_MULTIPLIER*TIME_LIMIT
 
 JUMP_MULTIPLIER = -20
 ALIGNMENT_MULTIPLIER = 1
-FLOOR_POINTS_MULTIPLIER = 800
+FLOOR_POINTS_MULTIPLIER = 3000
+DISCOVERY_MULTIPLIER = 100
 
 GRAVITY = .375
 SPACING = 200
@@ -71,9 +73,11 @@ PLAYER_TERMINAL_VELOCITY = -10
 RADIUS = 15
 JUMP_VELOCITY = 7
 LOOPS = WINDOW_HEIGHT//SPACING
-
-#carl_image = pygame.image.load('Carl.png').convert_alpha()
-#carl_image = pygame.transform.scale(carl_image,(2*RADIUS,2*RADIUS))
+PLAYER_HORIZONTAL_SPEED = 5
+PLAYER_HORIZONTAL_ACCELERATION = 0.15
+VISION = 150
+HOLE_VISION_MULTI = 0.5
+VISION_BUFFER_MULTIPLIER = 1.4
 
 globalFitness = -2000
 best_globalFitness = -2000
@@ -85,9 +89,8 @@ current_node_list = 0
 best_drones_file = 0
 list_of_best_drones = 0
 dictionary_of_best_drones = {}
-visual_dictionary_of_best_drones = {}
 formatted_array = []
-
+shown_birds = 1000
 
 frames = 0
 minimum_player_level = -1
@@ -98,6 +101,7 @@ screen_height = WINDOW_HEIGHT/2
 screen_width = 0
 player_position = WINDOW_WIDTH/2
 player_velocity = 0
+max_horizontal = int(3/4*SPACING/JUMP_VELOCITY*PLAYER_HORIZONTAL_SPEED*1.05) # Maximum distance a bird can travel horizontally while holding spacebar
 
 player_upper_pole_height_difference = 0
 player_lower_pole_height_difference = 0
@@ -105,13 +109,6 @@ player_left_pole_distance_difference = 0
 player_right_pole_distance_difference = 0
 
 #GlobalVariable Setup
-
-def superReplace(s,r,w=[],d=None): # string, replace, with, default
-  if d or d == False or d=="":
-    w = [w[_] if len(w)-1>=_ else str(d) for _ in range(len(r))]
-  for _ in range(len(r)):
-    s = s.replace(str(r[_]),str(w[_]))
-  return s
 
 def ListShapeGenerator(*args):
             _ = []
@@ -129,13 +126,15 @@ highgen = 0
 running = True
 generation = 1
 birdsToBreed = []
-number_of_birds_to_keep = 5
+number_of_birds_to_keep = 4
 singlePlayer = None
 respawn = False
 highscore = 0
-weight = 1.2                      
+weight = 1.3
 magic_breeding_numbers = [(10**(math.log10(weight)*(2+_)))-(10**((_+1)*math.log10(weight)))-weight+1 for _ in range(number_of_birds_to_keep)]
 magic_number = magic_breeding_numbers[-1]
+draw_players = True
+drawn_players = 0
 
 maze_level = 0
 
@@ -156,7 +155,7 @@ def init():
     INPUT: None
     OUTPUT: None"""
 
-    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list, tracking_list_current_number, maze_level, minimum_player_level, layers_deleted, load_bird, generation
+    global player, running, score, multiPlayer, singlePlayer, respawn, globalFitness, screen_height, kill_all, frames,tracking_list,tracking_list_current_number,maze_level,minimum_player_level, layers_deleted,load_bird
 
     #Reset some global variables
     score = 0
@@ -167,10 +166,12 @@ def init():
     running = True
     frames = 0
     maze_level = 0
-    tracking_list_current_number = 0
-    tracking_list = {}
-    for i in range(LOOPS+2):
-        tracking_list[i] = random.randint(0,WINDOW_WIDTH-SPACE+1)
+    tracking_list = {0: (random.randint(int(WINDOW_WIDTH/20),int(WINDOW_WIDTH/2-SPACE-max_horizontal-VISION_BUFFER_MULTIPLIER*(VISION*HOLE_VISION_MULTI-SPACE/2))) if random.randint(0,1) else random.randint(int(WINDOW_WIDTH/2+max_horizontal+VISION_BUFFER_MULTIPLIER*(VISION*HOLE_VISION_MULTI-SPACE/2)),int(WINDOW_WIDTH-SPACE-WINDOW_WIDTH/20)))}
+    init_list = int(bool(tracking_list))
+    tracking_list_current_number = init_list
+
+    for i in range(LOOPS+2-init_list):
+        tracking_list[i+init_list] = random.randint(0,WINDOW_WIDTH-SPACE+1)
         tracking_list_current_number += 1
 
     if (not AI): #User plays: Initialize exactly one bird.
@@ -178,8 +179,6 @@ def init():
         singlePlayer = drone.Drone(learning_rate)
         multiPlayer.append(singlePlayer)
     else:
-        if load_bird:
-            generation = 1
         print("New Gen " + str(generation))
         singlePlayer = drone.Drone(learning_rate)
         if (len(birdsToBreed) == 0):
@@ -212,7 +211,7 @@ def init():
                 multiPlayer.append(drone.Drone(learning_rate,*magic_breeding_function()))
             for _ in range(int(DROCK/3)):
                 #Breed and mutate the generations best bird a couple of times
-                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,1)]))
+                multiPlayer.append(drone.Drone(learning_rate,birdsToBreed[random.randint(0,math.ceil(number_of_birds_to_keep/5))]))
 
             for _ in range(int(DROCK/3)-2):
                 if (respawn): #Bad genes - replace some.
@@ -224,7 +223,7 @@ def init():
             if (respawn):
                 respawn = False
     for player in multiPlayer:
-        player.constants(RADIUS,MAZE_LINE_WIDTH,SPACE,SPACING,LOOPS,WINDOW_WIDTH,WINDOW_HEIGHT,AI,TIME_MULTIPLIER, LAYER_TIME_LIMIT)
+        player.constants(RADIUS,MAZE_LINE_WIDTH,SPACE,SPACING,LOOPS,WINDOW_WIDTH,WINDOW_HEIGHT,AI,TIME_MULTIPLIER,LAYER_TIME_LIMIT,JUMP_VELOCITY,PLAYER_TERMINAL_VELOCITY,PLAYER_HORIZONTAL_SPEED,VISION,HOLE_VISION_MULTI,DISCOVERY_MULTIPLIER)
 
 def magic_breeding_function(one=None):
     index_a = None
@@ -256,6 +255,7 @@ def generate_line(height,open_start,open_end,line_width,maze_width):
     pygame.draw.rect(window, (0,0,0), [open_end+maze_width,height,WINDOW_WIDTH-open_end,line_width])
 
 def generate_maze(maze_height, maze_width, minimum_player_level):
+    if DEBUG == 2: print("New Frame")
     global maze_level
     global layers_deleted
     global tracking_list_current_number
@@ -263,11 +263,14 @@ def generate_maze(maze_height, maze_width, minimum_player_level):
 
     window.fill((255,255,255))
 
+    drawn_players=0
     for player in multiPlayer:
-        if player.alive:
-            pygame.draw.circle(window,(0,0,0),(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y),RADIUS)
-            #carl_rectangle = carl_image.get_rect(center=(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y))
-            #window.blit(carl_image,carl_rectangle)
+        if drawn_players<=min(shown_birds,len(multiPlayer)):
+            if player.alive:
+                pygame.draw.circle(window,(0,0,0),(player.xPosition+maze_width,WINDOW_HEIGHT/2 + screen_height - player.y),RADIUS)
+                drawn_players+=1
+                if DEBUG == 2: print("I drew a player!")
+        else: break
             
     for x in range(minimum_player_level-2-layers_deleted):
         del tracking_list[x+layers_deleted]
@@ -285,7 +288,6 @@ def generate_maze(maze_height, maze_width, minimum_player_level):
             pygame.draw.rect(window, (0,0,0), [maze_width,((len(tracking_list))*SPACING + maze_height - maze_level*SPACING - WINDOW_HEIGHT),WINDOW_WIDTH,MAZE_LINE_WIDTH])
     pygame.draw.rect(window, (0,0,0), [maze_width-MAZE_LINE_WIDTH,0,MAZE_LINE_WIDTH,(bottom_level+4-layers_deleted)*SPACING + maze_height%SPACING + WINDOW_HEIGHT/2 + MAZE_LINE_WIDTH])
     pygame.draw.rect(window, (0,0,0), [WINDOW_WIDTH+maze_width,0,MAZE_LINE_WIDTH,(bottom_level+4-layers_deleted)*SPACING + maze_height%SPACING + WINDOW_HEIGHT/2 + MAZE_LINE_WIDTH])
-    
 
 init()
 
@@ -378,14 +380,6 @@ while True:
             init()
             pygame.display.flip()
         
-        if pygame.key.get_pressed()[pygame.K_d]:
-            player.xPosition += 5
-            time.sleep(.02)
-        
-        if pygame.key.get_pressed()[pygame.K_a]:
-            player.xPosition -= 5
-            time.sleep(.02)
-        
         if not pygame.key.get_pressed()[pygame.K_SPACE] and not jump_switch:
             jump_switch = True
 
@@ -401,6 +395,21 @@ while True:
             if pygame.key.get_pressed()[pygame.K_s]:
                 player.y -= 5
                 time.sleep(.02)
+            
+            if pygame.key.get_pressed()[pygame.K_d]:
+                player.xPosition += 5
+                time.sleep(.02)
+            
+            if pygame.key.get_pressed()[pygame.K_a]:
+                player.xPosition -= 5
+                time.sleep(.02)
+        else:
+            if pygame.key.get_pressed()[pygame.K_a]:
+                player.horizontal_velocity = max(-PLAYER_HORIZONTAL_SPEED,player.horizontal_velocity-PLAYER_HORIZONTAL_ACCELERATION)
+            
+            if pygame.key.get_pressed()[pygame.K_d]:
+                player.horizontal_velocity = min(PLAYER_HORIZONTAL_SPEED,player.horizontal_velocity+PLAYER_HORIZONTAL_ACCELERATION)
+
 
     if (player_position > WINDOW_WIDTH):
         player_position = WINDOW_WIDTH
@@ -449,16 +458,8 @@ while True:
 
         if pygame.key.get_pressed()[pygame.K_j] and current_save_switch:
             current_save_switch = False
-            f = open(FILE_NAME, "r")
-            best_drones_file = f.read()
-            f.close()
-            list_of_best_drones = best_drones_file.split(";")
-            print(list_of_best_drones[-5])
-            list_of_best_drones[-5] = list_of_best_drones[-5].split("\n")
-            print(list_of_best_drones[-5])
-            next_file_number = int(list_of_best_drones[-5][1]) + 1
             f = open(FILE_NAME, "a")
-            f.write("\n{};{};Current;{};{}".format(next_file_number,superReplace(str(drone.node_list_amount),["\n"," "],d=""),int(current_player_level),superReplace(str(current_node_list),["\n"," "],d="")))
+            f.write("\n{};Current;{};".format(next_file_number,current_player_level) + str(current_node_list).replace("\n", "").replace(" ",""))
             f.close()
 
         if not pygame.key.get_pressed()[pygame.K_k] and not best_save_switch:
@@ -466,14 +467,9 @@ while True:
 
         if pygame.key.get_pressed()[pygame.K_k] and best_save_switch:
             best_save_switch = False
-            f = open(FILE_NAME, "r")
-            best_drones_file = f.read()
-            f.close()
-            list_of_best_drones = best_drones_file.split(";")
-            list_of_best_drones[-5] = list_of_best_drones[-5].split("\n")
-            next_file_number = int(list_of_best_drones[-5][1]) + 1
+            next_file_number = 0
             f = open(FILE_NAME, "a")
-            f.write("\n{};{};Best;{};{}".format(next_file_number,superReplace(str(drone.node_list_amount),["\n"," "],d=""),int(best_player_level),superReplace(str(best_node_list),["\n"," "],d="")))
+            f.write("\n{};Best;{};".format(next_file_number,best_player_level) + str(best_node_list).replace("\n", "").replace(" ",""))
             f.close()
         
         if pygame.key.get_pressed()[pygame.K_n]:
@@ -484,12 +480,9 @@ while True:
             for x in range(len(list_of_best_drones)):
                 list_of_best_drones[x] = list_of_best_drones[x].split(";")
                 dictionary_of_best_drones[list_of_best_drones[x].pop(0)] = list_of_best_drones[x]
-                visual_dictionary_of_best_drones[x] = [["Neural net size is {}","Their {} levels completed is"," {} levels","Their genes are {}"][_].format(dictionary_of_best_drones[str(x+1)][_]) for _ in range(len(dictionary_of_best_drones[str(x+1)]))]
-                visual_dictionary_of_best_drones[x][1] = visual_dictionary_of_best_drones[x][1]+ visual_dictionary_of_best_drones[x].pop(2)
-                print(type(visual_dictionary_of_best_drones))
                 pick_dictionary_key = True
             while pick_dictionary_key:
-                dictionary_key = input(superReplace(str(visual_dictionary_of_best_drones),["', '","{","['","']",", ","}"],["\n","","","\n","\n",""])+ '\n\nWhich drone do you want?\n')
+                dictionary_key = input(str(dictionary_of_best_drones).replace(" ","\n")+ '\n\nWhich drone do you want?\n')
                 if dictionary_key in dictionary_of_best_drones:
                     if dictionary_of_best_drones[dictionary_key][0] == str(drone.node_list_amount).replace(" ",""):
                         unformatted_drone_array = dictionary_of_best_drones[dictionary_key][3]
@@ -498,7 +491,7 @@ while True:
                         print("Array is of wrong size")
                 else:
                     print("Key not in dictionary")
-            formatted_array = [np.array([[float(i) for i in superReplace(j,["[","]"],d="").split(",")] for j in k.split("],[")]) for k in superReplace(unformatted_drone_array,["array(",")]","[[["],["","","[["]).split("),")]
+            formatted_array = [np.array([[float(i) for i in j.replace("[","").replace("]","").split(",")] for j in k.split("],[")]) for k in unformatted_drone_array.replace("array(","").replace(")]","").replace("[[[","[[").split("),")]
             load_bird = True
             kill_all = True
 
@@ -538,6 +531,8 @@ while True:
                 player.handleCollision()
                 if (player.alive):
                     player.y += player.velocity
+                    player.xPosition += player.horizontal_velocity
+                    player.horizontal_velocity *= 0.95
                     noAlive += 1                    
 
                     #Jump or not?
@@ -549,10 +544,10 @@ while True:
                             player.velocity = JUMP_VELOCITY
                         if (movement[1] > movement[2]):
                             if (movement[1] > 0):
-                                player.xPosition -= 5
+                                player.horizontal_velocity = max(-PLAYER_HORIZONTAL_SPEED,player.horizontal_velocity-PLAYER_HORIZONTAL_ACCELERATION)   #minus
                         else:
                             if (movement[2] > 0):
-                                player.xPosition += 5
+                                player.horizontal_velocity = min(PLAYER_HORIZONTAL_SPEED,player.horizontal_velocity+PLAYER_HORIZONTAL_ACCELERATION)    #plus
                 
                 if (player.y//SPACING<minimum_player_level_temp or minimum_player_level_temp == -1):
                     minimum_player_level_temp = int(player.y//SPACING)
@@ -565,11 +560,19 @@ while True:
 
             if(player.recentlyDead):
                 player.recentlyDead = False
-                player.fitness += player.y
+                #player.fitness += player.y
                 total_floor_points = FLOOR_POINTS_MULTIPLIER*(player.y//SPACING)
+                player.fitness += 500
                 player.fitness += total_floor_points
-                alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(800-abs(player.distanceLeft-player.distanceRight)/2)))
-                player.fitness += alignment_points
+                #Alignment Points- Max raw 800. Min raw 0. Starts to increase when player is within half of window_width of hole.
+                alignment_points = ALIGNMENT_MULTIPLIER*(-abs((player.distanceLeft-player.distanceRight)/2)+max(abs((player.distanceLeft-player.distanceRight)/2),(WINDOW_WIDTH-abs(player.distanceLeft-player.distanceRight)/2)))
+                hole_found = True if player.distHole != float('inf') else False
+                if hole_found: player.fitness += alignment_points
+                #right_found = True if player.distanceRightWall != float('inf') else False
+                #if right_found: player.fitness += player.distanceRightWall
+                #left_found = True if player.distanceLeftWall != float('inf') else False
+                #if left_found: player.fitness += player.distanceLeftWall
+                player.fitness -= player.deathModifier
                 #jump_points = player.jumps*JUMP_MULTIPLIER
                 #player.fitness += jump_points
                 if time_limit_enabled:
@@ -587,7 +590,7 @@ while True:
                     globalFitness = player.fitness
         
         if free_cam == 0:
-            screen_height = max(highest_player_height, WINDOW_HEIGHT/2)
+            screen_height = max(WINDOW_HEIGHT/2,(highest_player_height+screen_height)/2)
             screen_width = 0
         elif free_cam == 1:
             screen_height = highest_player_height
